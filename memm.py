@@ -9,14 +9,24 @@ SSTART = '<//s>'
 END = '<s/>'
 EEND = '<s//>'
 
-def preprocess(train_file):
+def preprocess(train_file, is_test=False):
     with open(train_file) as f:
         raw = f.read().split('\n')
         f.close()
     size = len(raw)//3
-    data = []
+    data = []    
+    if is_test:
+        for i in range(0, len(raw), 3):
+            word_arr = raw[i].split()
+            line_length = len(word_arr)
+            default_ner = np.full(line_length, START, dtype="<U10")
+            default_ner[0] = SSTART
+            data.append([word_arr, raw[i + 1].split(), default_ner])
+        return data
+
     for i in range(0, len(raw), 3):
         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
+
 
     dev_idx = random.sample(range(size), size//5)
     train_idx = np.setdiff1d(range(size), dev_idx)
@@ -41,6 +51,15 @@ class MEMM(object):
         # [next_word_idx, next_pos_idx, next_ner_idx]
         self.next_idx = [4, 4, 4]
 
+        self.w_pos_bank = {}
+        self.w_pos_next_idx = 0
+
+        self.tags = set()
+        # number of possible tags
+        self.state_size = 0
+        # map indices to tags
+        self.idx2state = {}
+
         self.train = []
         self.dev = []
         self.test = []
@@ -48,7 +67,7 @@ class MEMM(object):
         self._from_data_train(data)
 
     # token = [word, POS, NER]
-    def set_token(self, sample, idx, size, is_bigram = False):
+    def set_token(self, sample, idx, size, is_bigram=False):
         if not is_bigram:
             bound = [-2, -1, size, size + 1]
             for i in range(4):
@@ -78,7 +97,9 @@ class MEMM(object):
     #           [POS, ..., POS], 
     #           [NER, ..., NER]]
     #           np.array
-    def construct_feature(self, sample, data_set):
+    def construct_feature(self, sample, data_set, is_test=False):
+        if is_test:
+            line_feature = []
         size = len(sample[0])
         for i in range(size):
             # np.array([word_idx, POS_idx, NER_idx])
@@ -90,7 +111,12 @@ class MEMM(object):
             prev_bigram = self.set_token(sample, i - 1, size, is_bigram=True)
             post_bigram = self.set_token(sample, i, size, is_bigram=True)
 
-            # [w, pos]
+            # w_pos_idx
+            w_pos = sample[0, i] + ' ' + sample[1, i]
+            self.w_pos_next_idx = update(w_pos, self.w_pos_bank, self.w_pos_next_idx)
+            w_pos_idx = self.w_pos_bank[w_pos]
+
+            # [w_idx, pos_idx]
             cur_w_pos = []
             for j in range(2):
                 self.next_idx[j] = update(sample[j, i], self.bank[j], self.next_idx[j])
@@ -101,17 +127,73 @@ class MEMM(object):
                 'w_ppost': ppost[0], 'w_prev_bigram': prev_bigram[0], 'w_post_bigram': post_bigram[0],
                 'pos_pprev': pprev[1], 'pos_prev': prev[1], 'pos': cur_w_pos[1], 'pos_post': post[1],
                 'pos_ppost': ppost[1], 'pos_prev_bigram': prev_bigram[1], 'pos_post_bigram': post_bigram[1],
-                'ner_pprev': pprev[2], 'ner_prev': prev[2], 'ner_prev_bigram': prev_bigram[2]
+                'ner_pprev': pprev[2], 'ner_prev': prev[2], 'ner_prev_bigram': prev_bigram[2],
+                'w_pos': w_pos_idx
                 }
-            data_set.append((d, sample[2, i]))
+            if is_test:
+                line_feature.append(d)
+            else:
+                data_set.append((d, sample[2, i]))
+                self.tags.add(sample[2, i])
+
+        if is_test:
+            data_set.append(line_feature)
+        else:
+            self.state_size = len(self.tags)
+            self.idx2state = dict(zip(range(self.state_size), self.tags))
     
     def _from_data_train(self, data):
         for sample in data:
             self.construct_feature(np.array(sample), self.train)
+        self.classifier = maxent.MaxentClassifier.train(self.train, trace=0)
+        # self.classifier.show_most_informative_features(n=30)
+    
+    # data = [[word, ..., word], 
+    #         [POS, ..., POS]]
+    def from_data_test(self, data):
+        for sample in data:
+            # featuresets separated by lines
+            self.construct_feature(np.array(sample), self.test, is_test=True)
+        for line in self.test:
+            self.viterbi(line)
+
+    # featuresets for a line in test
+    def viterbi(self, line):
+        state_size = self.state_size
+        idx2state = self.idx2state
+        ob_size = len(line)
+        v = np.zeros((state_size, ob_size))
+
+        prob_init = self.classifier.prob_classify(line[0])
+        for i in range(state_size):
+            v[i, 0] = prob_init.prob(idx2state[i])
+
+
+        for i in range(state_size):
+            for j in range(1, ob_size):
+                ft = line[j]
+                if j == 1:
+                    ft['ner_pprev'] = START
+                
+        
+    
+        # z = np.zeros((state_size, ob_size))
+        # for i in range(state_size):
+        #     for j in range(ob_size):
+        #         prob_test = self.classifier.prob_classify(line[j])
+        #         z[i, j] = prob_test.prob(idx2state[i])
+        # print(idx2state)
+        # print(z[:, 0])
+
+        
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_file', dest = 'train_file', default = 'sample.txt')
+    parser.add_argument('--test_file', dest = 'test_file', default = 'sample_test.txt')
     args = parser.parse_args()
     train_set, dev_set = preprocess(args.train_file)
     model = MEMM(train_set)
+    test_set = preprocess(args.test_file, is_test=True)
+    print(test_set)
+    model.from_data_test(test_set)
