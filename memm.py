@@ -16,13 +16,14 @@ def preprocess(train_file, is_test=False):
     size = len(raw)//3
     data = []    
     if is_test:
+        indices = []
         for i in range(0, len(raw), 3):
             word_arr = raw[i].split()
             line_length = len(word_arr)
-            default_ner = np.full(line_length, START, dtype="<U10")
-            default_ner[0] = SSTART
+            default_ner = np.full(line_length, 'O', dtype="<U10")
             data.append([word_arr, raw[i + 1].split(), default_ner])
-        return data
+            indices.append([int(idx) for idx in raw[i + 2].split()])
+        return data, indices
 
     for i in range(0, len(raw), 3):
         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
@@ -33,6 +34,8 @@ def preprocess(train_file, is_test=False):
     train_set = [data[idx] for idx in train_idx]
     dev_set = [data[idx] for idx in dev_idx]
     return train_set, dev_set
+
+
 
 def update(token, bank, next_idx):
     if not token in bank:
@@ -127,8 +130,8 @@ class MEMM(object):
                 'w_ppost': ppost[0], 'w_prev_bigram': prev_bigram[0], 'w_post_bigram': post_bigram[0],
                 'pos_pprev': pprev[1], 'pos_prev': prev[1], 'pos': cur_w_pos[1], 'pos_post': post[1],
                 'pos_ppost': ppost[1], 'pos_prev_bigram': prev_bigram[1], 'pos_post_bigram': post_bigram[1],
-                'ner_pprev': pprev[2], 'ner_prev': prev[2], 'ner_prev_bigram': prev_bigram[2],
-                'w_pos': w_pos_idx
+                'w_pos': w_pos_idx,'ner_prev': prev[2], 
+                # 'ner_pprev': pprev[2], 'ner_prev_bigram': prev_bigram[2]
                 }
             if is_test:
                 line_feature.append(d)
@@ -154,46 +157,79 @@ class MEMM(object):
         for sample in data:
             # featuresets separated by lines
             self.construct_feature(np.array(sample), self.test, is_test=True)
+        preds = []
         for line in self.test:
-            self.viterbi(line)
+            preds.append(self.viterbi(line))
+        return preds
+
+    def prev_max(self, v_prev, ft, ner):
+        s = np.zeros(self.state_size)
+        for i in range(self.state_size):
+            ner_prev = self.idx2state[i]
+            ft['ner_prev'] = self.bank[2][ner_prev]
+            prob_d = self.classifier.prob_classify(ft)
+            s[i] = prob_d.prob(ner)*v_prev[i]
+        max_idx = np.argmax(s)
+        # maximum value  and index given current NER over previous NER
+        return s[max_idx], max_idx
+
+    def recover_path(self, bp, bestpathpointer, ob_size):
+        path = np.zeros(ob_size, dtype=int)
+        path[-1] = bestpathpointer
+        for i in range(ob_size - 2, -1, -1):
+            path[i] = bp[i + 1, path[i + 1]]
+        return [self.idx2state[idx] for idx in path]
 
     # featuresets for a line in test
     def viterbi(self, line):
         state_size = self.state_size
         idx2state = self.idx2state
         ob_size = len(line)
-        v = np.zeros((state_size, ob_size))
+        
+        #   [[...]
+        # o  [...]  
+        # b  [...]  
+        #    [...]]
+        #    state
+        v = np.zeros((ob_size, state_size))
+        bp = np.zeros((ob_size, state_size), dtype=int)
 
         prob_init = self.classifier.prob_classify(line[0])
         for i in range(state_size):
-            v[i, 0] = prob_init.prob(idx2state[i])
+            v[0, i] = prob_init.prob(idx2state[i])
+
+        for i in range(1, ob_size):
+            ft = line[i]
+            for j in range(state_size):
+                ner = idx2state[j]
+                v[i, j], bp[i, j] = self.prev_max(v[i - 1, :], ft, ner)
+
+        bestpathpointer = np.argmax(v[-1, :])
+        bestpathprob = v[-1, bestpathpointer]
+        return self.recover_path(bp, bestpathpointer, ob_size)
 
 
-        for i in range(state_size):
-            for j in range(1, ob_size):
-                ft = line[j]
-                if j == 1:
-                    ft['ner_pprev'] = START
-                
-        
-    
-        # z = np.zeros((state_size, ob_size))
-        # for i in range(state_size):
-        #     for j in range(ob_size):
-        #         prob_test = self.classifier.prob_classify(line[j])
-        #         z[i, j] = prob_test.prob(idx2state[i])
-        # print(idx2state)
-        # print(z[:, 0])
+# def preprocess_test(test_file):
+#     with open(test_file) as f:
+#         raw = f.read().split('\n')
+#         f.close()
+#     data = []    
 
+#     for i in range(0, len(raw), 3):
+#         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
+
+#     return data
         
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_file', dest = 'train_file', default = 'sample.txt')
-    parser.add_argument('--test_file', dest = 'test_file', default = 'sample_test.txt')
+    parser.add_argument('--test_file', dest = 'test_file', default = 'sample.txt')
     args = parser.parse_args()
     train_set, dev_set = preprocess(args.train_file)
     model = MEMM(train_set)
-    test_set = preprocess(args.test_file, is_test=True)
-    print(test_set)
+    test_set, indices = preprocess(args.test_file, is_test=True)
     model.from_data_test(test_set)
+    # test_set = preprocess_test(args.test_file)
+    # model = MEMM(test_set)
+    print(model.from_data_test(test_set))
