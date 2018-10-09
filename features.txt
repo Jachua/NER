@@ -1,6 +1,0 @@
-Features using a modified feature template 8.33 in Speech and Language Processing.
-
-feature template 
-<NER_i, w_{i - 2}>, <NER_i, w_{i - 1}>, <NER_i, w_i, w_{i + 1}>, <NER_i, w_{i + 2}>, <NER_i, w_{i - 1}w_i>, <NER_i, w_iw_{i + 1}>, <NER_i, POS_{i - 2}>, <NER_i, POS_{i - 1}>, <NER_i, POS_i>, <NER_i, w_{i + 1}>, <NER_i, POS_{i + 2}>, <NER_i, POS_{i - 1}POS_i>, <NER_i, POS_iPOS{i + 1}> <NER_i, NER_{i - 1}> 
-features for unknown words
-<NER_i, word shape> <NER_i, word shape shortened> <NER_i, word contains numbers> <NER_i, word contains upper case letters> <NER_i, word contains hyphens> <NER_i, all letters in word are upper case>
