@@ -73,6 +73,9 @@ class MEMM(object):
         self.dev = []
         self.test = []
 
+        self.shape_bank = {}
+        self.shape_next_idx = 0
+
         self._from_data_train(data)
 
     # token = [word, POS, NER]
@@ -135,6 +138,10 @@ class MEMM(object):
             w = sample[0, i]
             shape = wordshape(w)
             shape_short = wordshape(w, True)
+            self.shape_next_idx = update(shape, self.shape_bank, self.shape_next_idx)
+            self.shape_next_idx = update(shape_short, self.shape_bank, self.shape_next_idx)
+            shape_idx = self.shape_bank[shape]
+            shape_short_idx = self.shape_bank[shape_short]
             contain_num = int('d' in shape_short)
             contain_upper = int('X' in shape_short)
             contain_hyphen = int('-' in shape_short)
@@ -145,7 +152,7 @@ class MEMM(object):
                 'w_ppost': ppost[0], 'w_prev_bigram': prev_bigram[0], 'w_post_bigram': post_bigram[0],
                 'pos_pprev': pprev[1], 'pos_prev': prev[1], 'pos': cur_w_pos[1], 'pos_post': post[1],
                 'pos_ppost': ppost[1], 'pos_prev_bigram': prev_bigram[1], 'pos_post_bigram': post_bigram[1],
-                'w_pos': w_pos_idx,'ner_prev': prev[2], 'shape': shape, 'shape_short': shape_short,
+                'w_pos': w_pos_idx,'ner_prev': prev[2], 'shape': shape_idx, 'shape_short': shape_short_idx,
                 'contain_num': contain_num, 'contain_upper': contain_upper, 'contain_hyphen': contain_hyphen,
                 'all_upper': all_upper
                 # 'ner_pprev': pprev[2], 'ner_prev_bigram': prev_bigram[2]
