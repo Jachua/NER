@@ -28,7 +28,7 @@ def preprocess(train_file, is_test=False):
     for i in range(0, len(raw), 3):
         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
 
-
+    # data split into 80% training, 20% validation
     dev_idx = random.sample(range(size), size//5)
     train_idx = np.setdiff1d(range(size), dev_idx)
     train_set = [data[idx] for idx in train_idx]
@@ -132,7 +132,7 @@ class MEMM(object):
                 cur_w_pos.append(self.bank[j][sample[j, i]])
 
             # features for unknown words
-            w = sample[j, i]
+            w = sample[0, i]
             shape = wordshape(w)
             shape_short = wordshape(w, True)
             contain_num = int('d' in shape_short)
@@ -227,16 +227,16 @@ class MEMM(object):
         return self.recover_path(bp, bestpathpointer, ob_size)
 
 
-def preprocess_test(test_file):
-    with open(test_file) as f:
-        raw = f.read().split('\n')
-        f.close()
-    data = []    
+# def preprocess_test(test_file):
+#     with open(test_file) as f:
+#         raw = f.read().split('\n')
+#         f.close()
+#     data = []    
 
-    for i in range(0, len(raw), 3):
-        data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
+#     for i in range(0, len(raw), 3):
+#         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
 
-    return data
+#     return data
         
 
 if __name__ == '__main__':
