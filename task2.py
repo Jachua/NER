@@ -6,12 +6,13 @@ POS_INDEX = 1
 LABEL_INDEX = 2
 SEPARATOR = "\t"
 
+
 class LexiconBaselineSystem:
   def __init__(self, sentences):
     self.named_entities = set()
-    self.setup(sentences)
+    self._setup(sentences)
 
-  def setup(self, sentences):
+  def _setup(self, sentences):
     for sentence in sentences:
       named_entity = None
       for token in sentence:
@@ -41,6 +42,59 @@ class LexiconBaselineSystem:
       labels += label
 
     return labels
+
+
+# Modified code from P1
+class NGram(object):
+  def __init__(self, sentences):
+      self._build(sentences)
+
+  def _build(self, sentences):
+    self.bigrams = {}
+    for sentence in sentences:
+      for i in range(len(sentence) - 1):
+        w1 = sentence[i]
+        w2 = sentence[i + 1]
+        if w1 not in self.bigrams:
+          self.bigrams[w1] = {}
+        if w2 not in self.bigrams[w1]:
+          self.bigrams[w1][w2] = 0
+        self.bigrams[w1][w2] += 1
+
+  def prob(self, w1, w2):
+    # computes P(w2|w1)
+    pw1 = self.bigram[w1]
+    pw1w2 = pw1[w2]
+    count = sum(pw1.values())
+
+    return pw1w2 / count
+
+
+class HMMSystem:
+  def __init__(self, sentences):
+    self._setup(sentences)
+
+  def _setup(self, sentences):
+    pos = list(map(lambda sentence: list(map(lambda s: s[POS_INDEX])), sentences))
+    self.transition_probabilities = NGram(pos)
+
+    self.emission_probabities = {}
+    for sentence in sentences:
+      for s in sentence:
+        token = s[TOKEN_INDEX]
+        pos = s[POS_INDEX]
+        if pos not in self.emission_probabilities:
+          self.emission_probabilities[pos] = {}
+        if token not in self.emission_probabilities[pos]:
+          self.emission_probabilities[pos][token] = 0
+        self.emission_probabilities[pos][token] += 1
+
+  def prob(self, pos, token):
+    pw1 = self.emission_probabilities[pos]
+    pw1w2 = pw1[token]
+    count = sum(pw1.values())
+
+    return pw1w2 / count
 
 
 def check_system(system, sentences):
