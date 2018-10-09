@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from nltk.classify import maxent
-
+import re
 import argparse
 
 START = '</s>'
@@ -35,14 +35,20 @@ def preprocess(train_file, is_test=False):
     dev_set = [data[idx] for idx in dev_idx]
     return train_set, dev_set
 
-
-
 def update(token, bank, next_idx):
     if not token in bank:
         bank[token] = next_idx
         next_idx += 1
     return next_idx
 
+def wordshape(text, is_short=False):
+    sp = ''
+    if is_short:
+        sp = '+'
+    replace_upper = re.sub('[A-Z]' + sp, 'X', text)
+    replace_lower = re.sub('[a-z]' + sp, 'x', replace_upper)
+    shape = re.sub('[0-9]' + sp, 'd', replace_lower)
+    return shape
 
 class MEMM(object):
 
@@ -125,12 +131,23 @@ class MEMM(object):
                 self.next_idx[j] = update(sample[j, i], self.bank[j], self.next_idx[j])
                 cur_w_pos.append(self.bank[j][sample[j, i]])
 
+            # features for unknown words
+            w = sample[j, i]
+            shape = wordshape(w)
+            shape_short = wordshape(w, True)
+            contain_num = int('d' in shape_short)
+            contain_upper = int('X' in shape_short)
+            contain_hyphen = int('-' in shape_short)
+            all_upper = int(w.isupper())
+
             d = {
                 'w_pprev': pprev[0], 'w_prev': prev[0], 'w': cur_w_pos[0], 'w_post': post[0],
                 'w_ppost': ppost[0], 'w_prev_bigram': prev_bigram[0], 'w_post_bigram': post_bigram[0],
                 'pos_pprev': pprev[1], 'pos_prev': prev[1], 'pos': cur_w_pos[1], 'pos_post': post[1],
                 'pos_ppost': ppost[1], 'pos_prev_bigram': prev_bigram[1], 'pos_post_bigram': post_bigram[1],
-                'w_pos': w_pos_idx,'ner_prev': prev[2], 
+                'w_pos': w_pos_idx,'ner_prev': prev[2], 'shape': shape, 'shape_short': shape_short,
+                'contain_num': contain_num, 'contain_upper': contain_upper, 'contain_hyphen': contain_hyphen,
+                'all_upper': all_upper
                 # 'ner_pprev': pprev[2], 'ner_prev_bigram': prev_bigram[2]
                 }
             if is_test:
@@ -148,8 +165,8 @@ class MEMM(object):
     def _from_data_train(self, data):
         for sample in data:
             self.construct_feature(np.array(sample), self.train)
-        self.classifier = maxent.MaxentClassifier.train(self.train, trace=0)
-        # self.classifier.show_most_informative_features(n=30)
+        self.classifier = maxent.MaxentClassifier.train(self.train, trace=5)
+        self.classifier.show_most_informative_features(n=30)
     
     # data = [[word, ..., word], 
     #         [POS, ..., POS]]
@@ -206,19 +223,20 @@ class MEMM(object):
 
         bestpathpointer = np.argmax(v[-1, :])
         bestpathprob = v[-1, bestpathpointer]
+        print("best path probability ", bestpathprob)
         return self.recover_path(bp, bestpathpointer, ob_size)
 
 
-# def preprocess_test(test_file):
-#     with open(test_file) as f:
-#         raw = f.read().split('\n')
-#         f.close()
-#     data = []    
+def preprocess_test(test_file):
+    with open(test_file) as f:
+        raw = f.read().split('\n')
+        f.close()
+    data = []    
 
-#     for i in range(0, len(raw), 3):
-#         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
+    for i in range(0, len(raw), 3):
+        data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
 
-#     return data
+    return data
         
 
 if __name__ == '__main__':
@@ -226,10 +244,17 @@ if __name__ == '__main__':
     parser.add_argument('--train_file', dest = 'train_file', default = 'sample.txt')
     parser.add_argument('--test_file', dest = 'test_file', default = 'sample.txt')
     args = parser.parse_args()
+
+
     train_set, dev_set = preprocess(args.train_file)
     model = MEMM(train_set)
-    test_set, indices = preprocess(args.test_file, is_test=True)
-    model.from_data_test(test_set)
+
+    preds = model.from_data_test(dev_set)
+    for i in range(len(dev_set)):
+        print("\n\n=====\n\nPredictions\n", preds[i])
+        print("\n\n=====\n\nCorrect tags\n", dev_set[3 * i + 2])
+
+    # test_set, indices = preprocess(args.test_file, is_test=True)
     # test_set = preprocess_test(args.test_file)
     # model = MEMM(test_set)
-    print(model.from_data_test(test_set))
+    # print(model.from_data_test(test_set))
