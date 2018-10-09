@@ -1,0 +1,36 @@
+Features using a modified feature template 8.33 in Speech and Language Processing.
+
+feature template 
+<NER_i, w_{i - 2}>, <NER_i, w_{i - 1}>, <NER_i, w_i, w_{i + 1}>, <NER_i, w_{i + 2}>, <NER_i, w_{i - 1}w_i>, <NER_i, w_iw_{i + 1}>, <NER_i, POS_{i - 2}>, <NER_i, POS_{i - 1}>, <NER_i, POS_i>, <NER_i, w_{i + 1}>, <NER_i, POS_{i + 2}>, <NER_i, POS_{i - 1}POS_i>, <NER_i, POS_iPOS{i + 1}> <NER_i, NER_{i - 1}>
+
+most informative features generated from the MaxEnt classifier ranked by weights 
+  -9.366 pos==21 and label is 'B-LOC'
+   7.432 w_prev_bigram==37505.0 and label is 'B-PER'
+  -7.382 pos_post==38.0 and label is 'I-PER'
+  -7.262 pos==4 and label is 'B-MISC'
+  -7.238 pos==21 and label is 'B-PER'
+  -7.048 pos==73 and label is 'B-MISC'
+  -6.981 ner_prev==12.0 and label is 'B-LOC'
+  -6.735 ner_pprev==8.0 and label is 'I-PER'
+   6.702 w_post_bigram==65184.0 and label is 'B-ORG'
+   6.579 w_prev_bigram==83871.0 and label is 'I-MISC'
+   6.579 w_post_bigram==83872.0 and label is 'I-MISC'
+  -6.566 pos==8 and label is 'I-PER'
+  -6.532 pos_post==28.0 and label is 'B-LOC'
+  -6.531 pos==4 and label is 'B-PER'
+   6.492 w_post_bigram==27859.0 and label is 'B-PER'
+  -6.482 ner_prev==22.0 and label is 'B-PER'
+   6.405 w_post_bigram==83012.0 and label is 'B-ORG'
+  -6.342 pos==38 and label is 'I-LOC'
+  -6.330 pos_post==106.0 and label is 'I-ORG'
+   6.284 w_post_bigram==46721.0 and label is 'B-LOC'
+  -6.153 ner_prev==8.0 and label is 'B-PER'
+  -6.137 pos_post==28.0 and label is 'I-PER'
+  -6.111 ner_pprev==22.0 and label is 'I-ORG'
+  -6.090 ner_prev==8.0 and label is 'B-LOC'
+  -6.079 pos_prev==4.0 and label is 'I-PER'
+   6.051 w_prev==72432.0 and label is 'I-LOC'
+   6.051 w_prev_bigram==72435.0 and label is 'I-LOC'
+  -5.955 pos_prev==38.0 and label is 'I-PER'
+  -5.923 w==2659 and label is 'O'
+   5.890 w_prev==24211.0 and label is 'I-LOC'
