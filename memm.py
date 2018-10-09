@@ -250,9 +250,9 @@ if __name__ == '__main__':
     model = MEMM(train_set)
 
     preds = model.from_data_test(dev_set)
-    for i in range(len(dev_set)):
+    for i in range(len(preds)):
         print("\n\n=====\n\nPredictions\n", preds[i])
-        print("\n\n=====\n\nCorrect tags\n", dev_set[3 * i + 2])
+        print("\n\n=====\n\nCorrect tags\n", dev_set[i][2])
 
     # test_set, indices = preprocess(args.test_file, is_test=True)
     # test_set = preprocess_test(args.test_file)
