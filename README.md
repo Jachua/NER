@@ -14,3 +14,15 @@ $
 $
 
 Trained with maximum entropy classifier from [NLTK](https://github.com/nltk/nltk) package. Decoded with Viterbi algorithm.
+
+
+Could take up to hours to train the MaxEnt Classifier from the NLTK package. Converges after ~20 iterations for the training set (i.e. 80\% of train.txt) when log likelihood = -0.035. 
+
+
+Most informative features generated from the MaxEnt classifier ranked by weights includes:
+* whether the letters in the target word are all upper case (most significant for I-ORG, I-LOC, I_MISC)
+* POS tags for words around the target word (most significant for B-MISC, I-PER)
+* whether the target word contain hyphen (most significant for I-ORG, I-LOC), contain number (most significant for I-ORG, I-MISC)
+* shape of the target word (most significant for O)
+
+All weights associated with these features are negative, suggesting that the classifier mainly relies on  elimination. Curiously, the NER tag for the previous word does not factor heavily into the classification, so viterbi contributes less to the predictions for MEMM than in HMM. Rather, the most informative features are derived from information about word shape.
