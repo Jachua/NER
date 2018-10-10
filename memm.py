@@ -147,6 +147,7 @@ class MEMM(object):
             contain_hyphen = int('-' in shape_short)
             all_upper = int(w.isupper())
 
+            # TODO: improve ner_prev with B-NER and I-NER
             d = {
                 'w_pprev': pprev[0], 'w_prev': prev[0], 'w': cur_w_pos[0], 'w_post': post[0],
                 'w_ppost': ppost[0], 'w_prev_bigram': prev_bigram[0], 'w_post_bigram': post_bigram[0],
@@ -172,7 +173,7 @@ class MEMM(object):
     def _from_data_train(self, data):
         for sample in data:
             self.construct_feature(np.array(sample), self.train)
-        self.classifier = maxent.MaxentClassifier.train(self.train, trace=5)
+        self.classifier = maxent.MaxentClassifier.train(self.train, trace=5, min_ll = -0.02)
         self.classifier.show_most_informative_features(n=30)
     
     # data = [[word, ..., word], 
