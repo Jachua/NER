@@ -5,6 +5,7 @@ TOKEN_INDEX = 0
 POS_INDEX = 1
 LABEL_INDEX = 2
 SEPARATOR = "\t"
+EPSILON = 0.001
 
 
 class LexiconBaselineSystem:
@@ -51,21 +52,36 @@ class NGram(object):
 
   def _build(self, sentences):
     self.bigrams = {}
+    self.tags = set()
     for sentence in sentences:
       for i in range(len(sentence) - 1):
         w1 = sentence[i]
         w2 = sentence[i + 1]
+        self.tags.add(w1)
+        self.tags.add(w2)
         if w1 not in self.bigrams:
           self.bigrams[w1] = {}
         if w2 not in self.bigrams[w1]:
           self.bigrams[w1][w2] = 0
         self.bigrams[w1][w2] += 1
 
+    for tag1 in self.tags:
+      for tag2 in self.tags:
+        if tag1.startswith("O") and tag2.startswith("I"):
+          continue
+        if tag1 not in self.bigrams:
+          self.bigrams[tag1] = {}
+        if tag2 not in self.bigrams[tag1]:
+          self.bigrams[tag1][tag2] = 0
+        self.bigrams[tag1][tag2]
+
   def prob(self, w1, w2):
-    if w1 not in self.bigrams:
-      return 0.0001
-    elif w2 not in self.bigrams[w1]:
-      return 0.0001
+    if w1.startswith("O") and w2.startswith("I"):
+      return 0
+    #if w1 not in self.bigrams:
+    #  return EPSILON
+    #elif w2 not in self.bigrams[w1]:
+    #  return EPSILON
     # computes P(w2|w1)
     pw1 = self.bigrams[w1]
     pw1w2 = pw1[w2]
@@ -79,13 +95,13 @@ class HMMSystem:
     self._setup(sentences)
 
   def _setup(self, sentences):
-    pos = list(map(lambda sentence: list(map(lambda s: s[POS_INDEX], sentence)), sentences))
+    label = list(map(lambda sentence: list(map(lambda s: s[LABEL_INDEX].strip(), sentence)), sentences))
     self.states = set()
-    for p in pos:
-      self.states = self.states.union(set(p))
+    for l in label:
+      self.states = self.states.union(set(l))
     self.states = list(self.states)
 
-    self.transition_probabilities = NGram(pos)
+    self.transition_probabilities = NGram(label)
     self.initial_probabilities = {}
     self.emission_probabilities = {}
     for state in self.states:
@@ -94,33 +110,34 @@ class HMMSystem:
     for sentence in sentences:
       for index in range(len(sentence)):
         s = sentence[index]
-        token = s[TOKEN_INDEX]
-        pos = s[POS_INDEX]
+        token = s[TOKEN_INDEX].strip()
+        label = s[LABEL_INDEX].strip()
         if index == 0:
-          self.initial_probabilities[pos] += 1
+          self.initial_probabilities[label] += 1
 
-        if pos not in self.emission_probabilities:
-          self.emission_probabilities[pos] = {}
-        if token not in self.emission_probabilities[pos]:
-          self.emission_probabilities[pos][token] = 0.0
-        self.emission_probabilities[pos][token] += 1
+        if label not in self.emission_probabilities:
+          self.emission_probabilities[label] = {}
+        if token not in self.emission_probabilities[label]:
+          self.emission_probabilities[label][token] = 0.0
+        self.emission_probabilities[label][token] += 1
 
-    for pos in self.initial_probabilities:
-      self.initial_probabilities[pos] = float(self.initial_probabilities[pos]) / len(sentences)
+    for label in self.initial_probabilities:
+      self.initial_probabilities[label] = float(self.initial_probabilities[label]) / len(sentences)
 
-    for pos in self.emission_probabilities:
-      count = sum(self.emission_probabilities[pos].values())
-      for token in self.emission_probabilities[pos]:
-        self.emission_probabilities[pos][token] /= count
+    for label in self.emission_probabilities:
+      count = sum(self.emission_probabilities[label].values())
+      for token in self.emission_probabilities[label]:
+        self.emission_probabilities[label][token] /= count
 
-  def prob(self, pos, token):
-    pw1 = self.emission_probabilities[pos]
+  def prob(self, label, token):
+    pw1 = self.emission_probabilities[label]
     pw1w2 = pw1[token]
     count = sum(pw1.values())
 
     return pw1w2 / count
 
   def viterbi(self, observations):
+    observations = list(map(lambda o: o.strip(), observations))
     num_observations = len(observations)
     num_states = len(self.states)
 
@@ -129,30 +146,30 @@ class HMMSystem:
 
     first_observation = observations[0]
     for state in self.states:
-      viterbi[state] = [0.0] * num_observations
+      viterbi[state] = [None] * num_observations
       backpointer[state] = [0] * num_observations
-      prob = self.emission_probabilities[state][first_observation] if first_observation in self.emission_probabilities[state] else 0.0001
+      prob = self.emission_probabilities[state][first_observation] if first_observation in self.emission_probabilities[state] else EPSILON
       viterbi[state][0] = self.initial_probabilities[state] * prob
 
     max_terminating_score = 0
     max_terminating_state = None
     for t in range(1, num_observations):
-      for s in self.states:
-        for state in self.states:
+      for prev_state in self.states:
+        for curr_state in self.states:
           pobs = observations[t - 1]
           obs = observations[t]
-          temp = viterbi[state][t - 1] * self.transition_probabilities.prob(pobs, obs)
-          if obs in self.emission_probabilities[s]:
-            temp *= self.emission_probabilities[s][obs]
+          temp = viterbi[curr_state][t - 1] * self.transition_probabilities.prob(prev_state, curr_state)
+          if obs in self.emission_probabilities[curr_state]:
+            temp *= self.emission_probabilities[curr_state][obs]
           else:
-            temp *= 0.0001
+            temp *= EPSILON
 
-          if temp > viterbi[s][t]:
-            backpointer[s][t] = state
-            viterbi[s][t] = temp
-            if t == num_observations - 1 and viterbi[s][t] > max_terminating_score:
-              max_terminating_score = viterbi[s][t]
-              max_terminating_state = s
+          if viterbi[curr_state][t] is None or temp > viterbi[curr_state][t]:
+            backpointer[curr_state][t] = prev_state
+            viterbi[curr_state][t] = temp
+            if t == num_observations - 1 and viterbi[curr_state][t] > max_terminating_score:
+              max_terminating_score = viterbi[curr_state][t]
+              max_terminating_state = curr_state
 
     state = max_terminating_state
     labels = [state]
@@ -163,14 +180,10 @@ class HMMSystem:
     return labels
 
   def label(self, sentences):
-    i = 0
+    labels = []
     for sentence in sentences:
-      print(sentence)
-      print(self.viterbi(sentence.split(SEPARATOR)))
-      i += 1
-      if i == 3:
-        raise Exception("")
-#    return list(map(lambda sentence: self.viterbi(sentence.split(SEPARATOR)), sentences))
+      labels += self.viterbi(sentence.split(SEPARATOR))
+    return labels
 
 
 def check_system(system, sentences):
