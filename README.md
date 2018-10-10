@@ -25,4 +25,4 @@ Most informative features generated from the MaxEnt classifier ranked by weights
 * whether the target word contains hyphen (most significant for I-ORG, I-LOC), contain number (most significant for I-ORG, I-MISC)
 * shape of the target word (most significant for O)
 
-All weights associated with the above features are negative, suggesting that the classifier relies strongly. Curiously, the NER tag for the previous word does not factor heavily into the classification, so viterbi contributes less to the predictions for MEMM than in HMM. Rather, the most informative features are derived from information about word shape.
+All weights associated with the above features are negative, suggesting that the classifier relies strongly on elimination. Curiously, the NER tag for the previous word does not factor heavily into the classification, so viterbi contributes less to the predictions for MEMM than in HMM. Rather, the most informative features are derived from information about word shape.
