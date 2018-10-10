@@ -76,18 +76,37 @@ class HMMSystem:
 
   def _setup(self, sentences):
     pos = list(map(lambda sentence: list(map(lambda s: s[POS_INDEX])), sentences))
-    self.transition_probabilities = NGram(pos)
+    self.states = set()
+    for p in pos:
+      self.states = self.states.union(set(p))
 
+    self.transition_probabilities = NGram(pos)
+    self.initial_probabilities = {}
     self.emission_probabities = {}
+    for pos in self.tags:
+      self.initial_probabilities[pos] = 0
+
     for sentence in sentences:
-      for s in sentence:
+      for index in len(sentence):
+        s = sentence[index]
         token = s[TOKEN_INDEX]
         pos = s[POS_INDEX]
+        if index == 0:
+          self.initial_probabilities[pos] += 1
+
         if pos not in self.emission_probabilities:
           self.emission_probabilities[pos] = {}
         if token not in self.emission_probabilities[pos]:
-          self.emission_probabilities[pos][token] = 0
+          self.emission_probabilities[pos][token] = 0.0
         self.emission_probabilities[pos][token] += 1
+
+    for pos in self.initial_probabilities:
+      self.initial_probabilities[pos] = float(self.initial_probabilities[pos]) / len(sentences)
+
+    for pos in self.emission_probabilities:
+      count = sum(self.emission_probabilities[pos].values())
+      for token in self.emission_probabilities[pos][token]:
+        self.emission_probabilities[pos][token] /= count
 
   def prob(self, pos, token):
     pw1 = self.emission_probabilities[pos]
@@ -95,6 +114,43 @@ class HMMSystem:
     count = sum(pw1.values())
 
     return pw1w2 / count
+
+  # observed - words
+  # hidden - pos
+  def label(self, observations):
+    num_observations = len(observations)
+    num_states = len(self.states)
+
+    viterbi = {}
+    backpointer = {}
+#    viterbi = [[0.0] * num_observations] * num_states
+#    backpointer = [[0] * num_observations] * num_stats
+
+    first_observation = observations[0]
+    for state in self.states:
+      viterbi[state] = [0.0] * num_observations
+      backpointer[state] = [0] * num_observations
+      viterbi[state][0] = self.initial_probabilities[state] * self.emission_probabilities[state][observation]
+
+    max_terminating_score = 0
+    max_terminating_state = None
+    for t in range(1, num_observations):
+      for s in range(num_states):
+        for state in self.states:
+          pobs = obseration[t - 1]
+          obs = observation[t]
+          temp = viterbi[state][t - 1] * self.emission_probabilities[s][obs] * self.transition_probabilities.prob(pobs, obs)
+          if temp > viterbi[s][t]:
+            backpointer[s][t] = state
+            viterbi[s][t] = temp
+            if t == num_observations - 1 and viterbi[s][t] > max_terminating_score:
+              max_terminating_score = viterbi[s][t]
+              max_terminating_state = s
+
+    labels = list(map(lambda o: "O", observations))
+    state = max_terminating_state
+
+    return labels
 
 
 def check_system(system, sentences):
