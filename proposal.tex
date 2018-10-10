@@ -1,0 +1,34 @@
+\title{CS 4740 Project 2 - Named Entity Recognition with HMMs and MEMMs Proposal}
+\author{Shannon Joyner, Jaclyn Huang, Dhiraj Gupta}
+\date{\today}
+
+\documentclass[12pt]{article}
+\usepackage[a4paper, total={7in, 10in}]{geometry}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+	urlcolor=blue,
+}
+
+\begin{document}
+\maketitle
+\textbf{HMM Overview:}
+For the NER task, our HMM implementation is essentially what was described in class. Our hidden variables are the tags {\tt B-xxx, I-xxx, O}, where {\tt xxx} is either a person, location, organization, or miscellaneous entity. The observed variables are the words in the sentence. Given a sequence of observed variables (i.e. a sentence), we would like to predict values for the hidden variables (tags) with the HMM. In order to do this, we compute the probability that tag $t$ follows tag $t'$ for all pairs of tags $(t, t')$. These probabilities can be estimated from tagged sentences in the same way a bigram language model estimates probabilities that word $w$ follows word $v$. Likewise, we can estimate the emission probabilities $P(w|t)$. These quantities are all that an HMM needs in order to predict tags (done using the Viterbi algorithm described in lecture). 
+
+\textbf{HMM Pros and Cons:} HMMs are good for this task because they can use local context (in the form of preceding tags) to make predictions. Furthermore, certain POS sequences are much more likely than others, making the sequence-based HMM a strong performer for this task. Cons of the HMM are that it cannot take advantage of a wide range of features (it mainly relies on preceding words), and that the computation time increases quadratically in the number of tags (so if we wanted to add more entity categories it wouldn't scale well).   
+
+\textbf{HMM vs MEMM:} HMMs and MEMMs are quite similar. The major difference is that MEMMs can incorporate more information than HMMs in order to decide on a tag for a word. For example, they can condition on any number of preceding words and tags to predict the current word's tag. MEMMs accomplish this by using a MaxEnt classifier to find $P(c|x)$ instead of $P(t|w)$. $c$ is a class, which is the same as a tag. But $x$ can be virtually any feature vector, offering a lot more flexibility than than the HMM. However, this flexibility comes with an increased computational overhead (to train a classifier). Also, choosing the wrong features might make the MEMM perform worse than an HMM.   
+
+\textbf{MEMM Features:}
+For our MEMM, we tentatively plan to use the following features:
+\begin{equation*}
+\begin{split}
+[&w_{i - 2},\ w_{i - 1},\ w_i,\ w_{i + 1}w_{i + 2}, 
+w_{i - 1}w_i,\ w_iw_{i + 1},\ POS_{i - 2},\ POS_{i - 1},\\ &POS_i,\ w_{i + 1},\ POS_{i + 2}, \ POS_{i - 1}POS_i,\ POS_iPOS_{i + 1},\ NER_{i - 1}]
+\end{split}
+\end{equation*}
+where $w_i$ is the $i$th word, $POS_i$ is the part-of-speech tag for $w_i$, and $NER_i$ is the NER tag for $w_i$ (consecutive symbols indicate a bigram). These features are based on the ones suggested in class and in the textbook. They provide POS information about word $w_i$ and the words in a small ``neighborhood" around $w_i$ and so should be a reasonable starting point. We have mapped these to numerical features, but that may interfere with the maximum entropy classifier. It might be necessary to break these features into many boolean features (e.g. $w_i$ becomes $|V|$ features whose values are 1 if $w_i = w$, 0 otherwise for all words $w$ in the vocabulary $V$). We do have a set of unknown word features as well:
+{\tt word shape, word shape shortened, word contains numbers, word contains upper case letters, word contains hyphens, all letters upper case}. Some of these are boolean features while others work the same way as the previous features. 
+   
+\end{document}
