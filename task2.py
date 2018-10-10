@@ -62,8 +62,12 @@ class NGram(object):
         self.bigrams[w1][w2] += 1
 
   def prob(self, w1, w2):
+    if w1 not in self.bigrams:
+      return 0.0001
+    elif w2 not in self.bigrams[w1]:
+      return 0.0001
     # computes P(w2|w1)
-    pw1 = self.bigram[w1]
+    pw1 = self.bigrams[w1]
     pw1w2 = pw1[w2]
     count = sum(pw1.values())
 
@@ -75,19 +79,20 @@ class HMMSystem:
     self._setup(sentences)
 
   def _setup(self, sentences):
-    pos = list(map(lambda sentence: list(map(lambda s: s[POS_INDEX])), sentences))
+    pos = list(map(lambda sentence: list(map(lambda s: s[POS_INDEX], sentence)), sentences))
     self.states = set()
     for p in pos:
       self.states = self.states.union(set(p))
+    self.states = list(self.states)
 
     self.transition_probabilities = NGram(pos)
     self.initial_probabilities = {}
-    self.emission_probabities = {}
-    for pos in self.tags:
-      self.initial_probabilities[pos] = 0
+    self.emission_probabilities = {}
+    for state in self.states:
+      self.initial_probabilities[state] = 0
 
     for sentence in sentences:
-      for index in len(sentence):
+      for index in range(len(sentence)):
         s = sentence[index]
         token = s[TOKEN_INDEX]
         pos = s[POS_INDEX]
@@ -105,7 +110,7 @@ class HMMSystem:
 
     for pos in self.emission_probabilities:
       count = sum(self.emission_probabilities[pos].values())
-      for token in self.emission_probabilities[pos][token]:
+      for token in self.emission_probabilities[pos]:
         self.emission_probabilities[pos][token] /= count
 
   def prob(self, pos, token):
@@ -115,31 +120,33 @@ class HMMSystem:
 
     return pw1w2 / count
 
-  # observed - words
-  # hidden - pos
-  def label(self, observations):
+  def viterbi(self, observations):
     num_observations = len(observations)
     num_states = len(self.states)
 
     viterbi = {}
     backpointer = {}
-#    viterbi = [[0.0] * num_observations] * num_states
-#    backpointer = [[0] * num_observations] * num_stats
 
     first_observation = observations[0]
     for state in self.states:
       viterbi[state] = [0.0] * num_observations
       backpointer[state] = [0] * num_observations
-      viterbi[state][0] = self.initial_probabilities[state] * self.emission_probabilities[state][observation]
+      prob = self.emission_probabilities[state][first_observation] if first_observation in self.emission_probabilities[state] else 0.0001
+      viterbi[state][0] = self.initial_probabilities[state] * prob
 
     max_terminating_score = 0
     max_terminating_state = None
     for t in range(1, num_observations):
-      for s in range(num_states):
+      for s in self.states:
         for state in self.states:
-          pobs = obseration[t - 1]
-          obs = observation[t]
-          temp = viterbi[state][t - 1] * self.emission_probabilities[s][obs] * self.transition_probabilities.prob(pobs, obs)
+          pobs = observations[t - 1]
+          obs = observations[t]
+          temp = viterbi[state][t - 1] * self.transition_probabilities.prob(pobs, obs)
+          if obs in self.emission_probabilities[s]:
+            temp *= self.emission_probabilities[s][obs]
+          else:
+            temp *= 0.0001
+
           if temp > viterbi[s][t]:
             backpointer[s][t] = state
             viterbi[s][t] = temp
@@ -147,10 +154,23 @@ class HMMSystem:
               max_terminating_score = viterbi[s][t]
               max_terminating_state = s
 
-    labels = list(map(lambda o: "O", observations))
     state = max_terminating_state
+    labels = [state]
+    for t in range(num_observations - 1, 0, -1):
+      state = backpointer[state][t]
+      labels = [state] + labels
 
     return labels
+
+  def label(self, sentences):
+    i = 0
+    for sentence in sentences:
+      print(sentence)
+      print(self.viterbi(sentence.split(SEPARATOR)))
+      i += 1
+      if i == 3:
+        raise Exception("")
+#    return list(map(lambda sentence: self.viterbi(sentence.split(SEPARATOR)), sentences))
 
 
 def check_system(system, sentences):
@@ -196,6 +216,9 @@ def main():
 
   baseline = LexiconBaselineSystem(train_sentences)
   check_system(baseline, validation_sentences)
+
+  hmm = HMMSystem(train_sentences)
+  check_system(hmm, validation_sentences)
 
 
 if __name__ == '__main__':
