@@ -34,7 +34,7 @@ w_{i - 1}w_i,\ w_iw_{i + 1},\ POS_{i - 2},\ POS_{i - 1},\\ &POS_i,\ w_{i + 1},\ 
 \end{split}
 \end{equation*}
 where $w_i$ is the $i$th word, $POS_i$ is the part-of-speech tag for $w_i$, and $NER_i$ is the NER tag for $w_i$ (consecutive symbols are bigrams). These features are based suggestions from lecture and the textbook. They provide POS information about word $w_i$ and the words in a small ``neighborhood" around $w_i$ and so should be a reasonable starting point. We have mapped these to numerical features, but that may interfere with the maximum entropy classifier. It might be necessary to break these features into many boolean features (e.g. $w_i$ becomes $|V|$ features whose values are 1 if $w_i = w$, 0 otherwise for all words $w$ in the vocabulary $V$). We do have a set of unknown word features as well:
-{\tt word shape, word shape shortened, word contains numbers, word contains upper case letters, word contains hyphens, all letters upper case}. Some of these are boolean features while others work the same way as the previous features.
+{\tt word shape, word shape shortened, word contains numbers, word contains upper case letters, word contains hyphens, all letters upper case}. Some of these are boolean features while others work the same way as the previous features. We are also considering including information about the prefix of the previous NER tag, i.e. B or I, to improve the significance of the previous label in the classifier.
 
 In our preliminary implementation of the MEMM, the performance is quite poor. It takes on the order of hours to run. We suspect this is caused by the MaxEnt classifier during training, not the Viterbi algorithm.
 
