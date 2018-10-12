@@ -10,7 +10,7 @@ SSTART = '<//s>'
 END = '<s/>'
 EEND = '<s//>'
 
-def preprocess(train_file, is_test=False):
+def preprocess(train_file, is_test=False, is_train=False):
     with open(train_file) as f:
         raw = f.read().split('\n')
         f.close()
@@ -30,6 +30,8 @@ def preprocess(train_file, is_test=False):
         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
 
     # data split into 80% training, 20% validation
+    if is_train:
+        return data, []
     dev_idx = random.sample(range(size), size//5)
     train_idx = np.setdiff1d(range(size), dev_idx)
     train_set = [data[idx] for idx in train_idx]
@@ -278,7 +280,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    train_set, dev_set = preprocess(args.train_file)
+    # train_set, dev_set = preprocess(args.train_file)
+    train_set, _ = preprocess(args.train_file, is_train=True)
     model = MEMM(train_set)
 
     # preds = model.from_data_test(dev_set)
