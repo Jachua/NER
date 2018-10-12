@@ -136,8 +136,12 @@ class HMMSystem:
 
     for label in self.emission_probabilities:
       count = sum(self.emission_probabilities[label].values())
+      bcount = sum(self.backoff_probabilities[label].values())
       for token in self.emission_probabilities[label]:
         self.emission_probabilities[label][token] /= count
+
+      for suffix in self.backoff_probabilities[label]:
+        self.backoff_probabilities[label][suffix] /= bcount
 
   def prob(self, label, token):
     pw1 = self.emission_probabilities[label]
@@ -172,11 +176,13 @@ class HMMSystem:
           if obs in self.emission_probabilities[curr_state]:
             temp *= self.emission_probabilities[curr_state][obs]
           else:
+            #temp *= EPSILON
             for suffix_length in range(SUFFIX_LENGTH, -1, -1):
               assert(suffix_length >= 0)
               suffix = obs[-suffix_length:]
               if suffix in self.backoff_probabilities[curr_state]:
                 temp *= self.backoff_probabilities[curr_state][suffix]
+                break
               if suffix_length == 0:
                 temp *= EPSILON
 
@@ -206,7 +212,7 @@ def check_system(system, sentences):
   tokens = []
   expected_labels = []
   for sentence in sentences:
-    tokens.append(SEPARATOR.join(list(map(lambda s: s[TOKEN_INDEX], sentence))))
+    tokens.append(SEPARATOR.join(list(map(lambda s: s[TOKEN_INDEX].lower(), sentence))))
     for s in sentence:
       expected_labels.append(s[LABEL_INDEX].strip())
 
