@@ -16,13 +16,13 @@ $
 Trained with maximum entropy classifier from [NLTK](https://github.com/nltk/nltk) package. Decoded with Viterbi algorithm.
 
 
-Could take up to hours to train the MaxEnt Classifier from the NLTK package. Converges after ~20 iterations for the training set (i.e. 80\% of train.txt) when log likelihood = -0.035. 
-
-
 Most informative features generated from the MaxEnt classifier ranked by weights include:
-* whether the letters in the target word are all upper case (most significant for I-ORG, I-LOC, I-MISC)
-* POS tags for words around the target word (most significant for B-MISC, I-PER)
-* whether the target word contains hyphen (most significant for I-ORG, I-LOC), contains number (most significant for I-ORG, I-MISC)
-* shape of the target word (most significant for O)
-
-All weights associated with the above features are negative, suggesting that the classifier relies strongly on elimination. Curiously, the NER tag for the previous word does not factor heavily into the classification, so viterbi contributes less to the predictions for MEMM than in HMM. Rather, the most informative features are derived from information about word shape.
+* whether $w_i$ contains uppercase letters - negative weights when the word does not contain uppercase letters, most significant for B-LOC, B-MISC, B-PER, B-ORG
+* $w_{i - 1}, w_i$ - positive weights, most significant for B-LOC, I-ORG, I-MISC
+* $w_{i - 1}$ - positive weights, most significant for I-LOC
+* $w_{i + 1}$ - positive weights, most significant for B-MISC, B-LOC
+* $w_i, w_{i + 1}$ - positive weights, most significant for B-MISC, I_MISC, O
+* $NER_{i - 1}$ - negative weights, most significant for B-PER, B-LOC, B-PER
+* $POS_i$ - negative weights, most significant for B-LOC
+* word shape - negative weights, most significant for I-ORG
+* $POS_{i + 1}$ - negative weights, most significant for I-PER

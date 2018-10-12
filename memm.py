@@ -3,6 +3,7 @@ import numpy as np
 from nltk.classify import maxent
 import re
 import argparse
+import csv
 
 START = '</s>'
 SSTART = '<//s>'
@@ -173,7 +174,7 @@ class MEMM(object):
     def _from_data_train(self, data):
         for sample in data:
             self.construct_feature(np.array(sample), self.train)
-        self.classifier = maxent.MaxentClassifier.train(self.train, trace=5, min_ll = -0.02)
+        self.classifier = maxent.MaxentClassifier.train(self.train, trace=5)
         self.classifier.show_most_informative_features(n=30)
     
     # data = [[word, ..., word], 
@@ -234,6 +235,29 @@ class MEMM(object):
         print("best path probability ", bestpathprob)
         return self.recover_path(bp, bestpathpointer, ob_size)
 
+def csv_out(preds, indices):
+    prev_idx = 0
+    prev_tag = preds[0][0][-4:]
+    output = {'-PER': [], '-LOC': [], '-ORG': [], 'MISC': []}
+    for i in range(len(preds)):
+        for j in range(len(preds[i])):
+            cur_idx = indices[i][j]
+            cur_tag = preds[i][j][-4:]
+            if cur_tag != prev_tag:
+                if prev_tag != 'O':
+                    output[prev_tag[-4:]].append(str(prev_idx) + '-' + str(cur_idx - 1))
+                prev_idx = cur_idx
+                prev_tag = cur_tag
+    if prev_tag != 'O':
+        output[prev_tag[-4:]].append(str(prev_idx) + '-' + str(cur_idx - 1))
+    type_arr = ['PER', 'LOC', 'ORG', 'MISC']
+    pred_arr = [' '.join(output['-PER']), ' '.join(output['-LOC']), ' '.join(output['-ORG']), 
+                ' '.join(output['MISC'])]
+    with open('memm.csv', 'w') as csvfile:
+        w = csv.writer(csvfile, delimiter=',')
+        w.writerow(['Type', 'Prediction'])
+        for i in range(4):
+            w.writerow([type_arr[i], pred_arr[i]])
 
 # def preprocess_test(test_file):
 #     with open(test_file) as f:
@@ -257,12 +281,14 @@ if __name__ == '__main__':
     train_set, dev_set = preprocess(args.train_file)
     model = MEMM(train_set)
 
-    preds = model.from_data_test(dev_set)
-    for i in range(len(preds)):
-        print("\n\n=====\n\nPredictions\n", preds[i])
-        print("\n\n=====\n\nCorrect tags\n", dev_set[i][2])
+    # preds = model.from_data_test(dev_set)
+    # for i in range(len(preds)):
+    #     print("\n\n=====\n\nPredictions\n", preds[i])
+    #     print("\n\n=====\n\nCorrect tags\n", dev_set[i][2])
 
-    # test_set, indices = preprocess(args.test_file, is_test=True)
+    test_set, indices = preprocess(args.test_file, is_test=True)
     # test_set = preprocess_test(args.test_file)
     # model = MEMM(test_set)
-    # print(model.from_data_test(test_set))
+
+    preds = model.from_data_test(test_set)
+    csv_out(preds, indices)
