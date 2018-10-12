@@ -66,8 +66,6 @@ class NGram(object):
 
     for tag1 in self.tags:
       for tag2 in self.tags:
-        if tag1.startswith("O") and tag2.startswith("I"):
-          continue
         if tag1 not in self.bigrams:
           self.bigrams[tag1] = {}
         if tag2 not in self.bigrams[tag1]:
@@ -77,13 +75,6 @@ class NGram(object):
           self.bigrams[tag1][tag2] += 1
 
   def prob(self, w1, w2):
-    if w1.startswith("O") and w2.startswith("I"):
-      return 0
-    #if w1 not in self.bigrams:
-    #  return EPSILON
-    #elif w2 not in self.bigrams[w1]:
-    #  return EPSILON
-    # computes P(w2|w1)
     pw1 = self.bigrams[w1]
     pw1w2 = pw1[w2]
     count = sum(pw1.values())
@@ -95,12 +86,26 @@ class HMMSystem:
   def __init__(self, sentences):
     self._setup(sentences)
 
+  def normalize(self, probabilities):
+    for label in probabilities:
+      count = sum(probabilities[label].values())
+      for token in probabilities[label]:
+        probabilities[label][token] /= count
+
+  def smooth(self, probabilities, tokens):
+    for label in probabilities:
+      for token in tokens:
+        if token not in probabilities[label]:
+          probabilities[label][token] = 0
+        probabilities[label][token] += 1
+
   def _setup(self, sentences):
     label = list(map(lambda sentence: list(map(lambda s: s[LABEL_INDEX].strip(), sentence)), sentences))
     self.states = set()
     for l in label:
       self.states = self.states.union(set(l))
     self.states = list(self.states)
+    # Made order we look at states deterministic
     self.states.sort()
 
     self.transition_probabilities = NGram(label)
@@ -110,11 +115,14 @@ class HMMSystem:
     for state in self.states:
       self.initial_probabilities[state] = 0
 
+    suffixes = set()
+    tokens = set()
     for sentence in sentences:
       for index in range(len(sentence)):
         s = sentence[index]
         token = s[TOKEN_INDEX].strip()
         label = s[LABEL_INDEX].strip()
+        tokens.add(token)
         if index == 0:
           self.initial_probabilities[label] += 1
 
@@ -123,27 +131,34 @@ class HMMSystem:
         if token not in self.emission_probabilities[label]:
           self.emission_probabilities[label][token] = 0.0
 
+        # Suffix backoff. Many POS have same morphology.
+        # For example, nouns tend to end in "-s" and verbs tend to end in "-ed"
+        # For cases where we can't find a word, we will attempt to use the suffix
+        # to assign a probability
         for suffix_length in range(1, SUFFIX_LENGTH + 1):
           suffix = token[-suffix_length:]
-          if label not in self.backoff_probabilities:
-            self.backoff_probabilities[label] = {}
-          if suffix not in self.backoff_probabilities[label]:
-            self.backoff_probabilities[label][suffix] = 0
-          self.backoff_probabilities[label][suffix] += 1
+          if len(suffix) > 0:
+            if label not in self.backoff_probabilities:
+              self.backoff_probabilities[label] = {}
+            if suffix not in self.backoff_probabilities[label]:
+              self.backoff_probabilities[label][suffix] = 0
+              suffixes.add(suffix)
+            self.backoff_probabilities[label][suffix] += 1
 
         self.emission_probabilities[label][token] += 1
 
+    # Initial probabilites for labels
     for label in self.initial_probabilities:
       self.initial_probabilities[label] = float(self.initial_probabilities[label]) / len(sentences)
 
-    for label in self.emission_probabilities:
-      count = sum(self.emission_probabilities[label].values())
-      bcount = sum(self.backoff_probabilities[label].values())
-      for token in self.emission_probabilities[label]:
-        self.emission_probabilities[label][token] /= count
+    # Plus one smoothing for emissions and backoff probabilities
+    suffixes.add("")
+    self.smooth(self.backoff_probabilities, suffixes)
+    self.smooth(self.emission_probabilities, tokens)
 
-      for suffix in self.backoff_probabilities[label]:
-        self.backoff_probabilities[label][suffix] /= bcount
+    # Normalize probabilities
+    self.normalize(self.emission_probabilities)
+    self.normalize(self.backoff_probabilities)
 
   def prob(self, label, token):
     pw1 = self.emission_probabilities[label]
@@ -178,7 +193,6 @@ class HMMSystem:
           if obs in self.emission_probabilities[curr_state]:
             temp *= self.emission_probabilities[curr_state][obs]
           else:
-            #temp *= EPSILON
             for suffix_length in range(SUFFIX_LENGTH, -1, -1):
               assert(suffix_length >= 0)
               suffix = obs[-suffix_length:]
