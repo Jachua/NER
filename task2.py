@@ -72,7 +72,9 @@ class NGram(object):
           self.bigrams[tag1] = {}
         if tag2 not in self.bigrams[tag1]:
           self.bigrams[tag1][tag2] = 0
-        self.bigrams[tag1][tag2]
+
+        if not ((tag1.startswith("B") or tag1.startswith("I")) and tag2.startswith("I") and tag1.split("-")[1] != tag2.split("-")[1]):
+          self.bigrams[tag1][tag2] += 1
 
   def prob(self, w1, w2):
     if w1.startswith("O") and w2.startswith("I"):
