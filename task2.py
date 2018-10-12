@@ -6,6 +6,7 @@ POS_INDEX = 1
 LABEL_INDEX = 2
 SEPARATOR = "\t"
 EPSILON = 0.001
+SUFFIX_LENGTH = 2
 
 
 class LexiconBaselineSystem:
@@ -104,6 +105,7 @@ class HMMSystem:
     self.transition_probabilities = NGram(label)
     self.initial_probabilities = {}
     self.emission_probabilities = {}
+    self.backoff_probabilities = {}
     for state in self.states:
       self.initial_probabilities[state] = 0
 
@@ -119,6 +121,15 @@ class HMMSystem:
           self.emission_probabilities[label] = {}
         if token not in self.emission_probabilities[label]:
           self.emission_probabilities[label][token] = 0.0
+
+        for suffix_length in range(1, SUFFIX_LENGTH + 1):
+          suffix = token[-suffix_length:]
+          if label not in self.backoff_probabilities:
+            self.backoff_probabilities[label] = {}
+          if suffix not in self.backoff_probabilities[label]:
+            self.backoff_probabilities[label][suffix] = 0
+          self.backoff_probabilities[label][suffix] += 1
+
         self.emission_probabilities[label][token] += 1
 
     for label in self.initial_probabilities:
@@ -162,7 +173,13 @@ class HMMSystem:
           if obs in self.emission_probabilities[curr_state]:
             temp *= self.emission_probabilities[curr_state][obs]
           else:
-            temp *= EPSILON
+            for suffix_length in range(SUFFIX_LENGTH, -1, -1):
+              assert(suffix_length >= 0)
+              suffix = obs[-suffix_length:]
+              if suffix in self.backoff_probabilities[curr_state]:
+                temp *= self.backoff_probabilities[curr_state][suffix]
+              if suffix_length == 0:
+                temp *= EPSILON
 
           if viterbi[curr_state][t] is None or temp > viterbi[curr_state][t]:
             backpointer[curr_state][t] = prev_state
