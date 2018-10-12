@@ -1,10 +1,10 @@
 # import argparse
-import random
-
 TOKEN_INDEX = 0
 POS_INDEX = 1
 LABEL_INDEX = 2
 SEPARATOR = "\t"
+EPSILON = 0.001
+SUFFIX_LENGTH = 2
 
 
 class LexiconBaselineSystem:
@@ -51,19 +51,31 @@ class NGram(object):
 
   def _build(self, sentences):
     self.bigrams = {}
+    self.tags = set()
     for sentence in sentences:
       for i in range(len(sentence) - 1):
         w1 = sentence[i]
         w2 = sentence[i + 1]
+        self.tags.add(w1)
+        self.tags.add(w2)
         if w1 not in self.bigrams:
           self.bigrams[w1] = {}
         if w2 not in self.bigrams[w1]:
           self.bigrams[w1][w2] = 0
         self.bigrams[w1][w2] += 1
 
+    for tag1 in self.tags:
+      for tag2 in self.tags:
+        if tag1 not in self.bigrams:
+          self.bigrams[tag1] = {}
+        if tag2 not in self.bigrams[tag1]:
+          self.bigrams[tag1][tag2] = 0
+
+        if not ((tag1.startswith("B") or tag1.startswith("I")) and tag2.startswith("I") and tag1.split("-")[1] != tag2.split("-")[1]):
+          self.bigrams[tag1][tag2] += 1
+
   def prob(self, w1, w2):
-    # computes P(w2|w1)
-    pw1 = self.bigram[w1]
+    pw1 = self.bigrams[w1]
     pw1w2 = pw1[w2]
     count = sum(pw1.values())
 
@@ -74,34 +86,149 @@ class HMMSystem:
   def __init__(self, sentences):
     self._setup(sentences)
 
+  def normalize(self, probabilities):
+    for label in probabilities:
+      count = sum(probabilities[label].values())
+      for token in probabilities[label]:
+        probabilities[label][token] /= count
+
+  def smooth(self, probabilities, tokens):
+    for label in probabilities:
+      for token in tokens:
+        if token not in probabilities[label]:
+          probabilities[label][token] = 0
+        probabilities[label][token] += 1
+
   def _setup(self, sentences):
-    pos = list(map(lambda sentence: list(map(lambda s: s[POS_INDEX])), sentences))
-    self.transition_probabilities = NGram(pos)
+    label = list(map(lambda sentence: list(map(lambda s: s[LABEL_INDEX].strip(), sentence)), sentences))
+    self.states = set()
+    for l in label:
+      self.states = self.states.union(set(l))
+    self.states = list(self.states)
+    # Made order we look at states deterministic
+    self.states.sort()
 
-    self.emission_probabities = {}
+    self.transition_probabilities = NGram(label)
+    self.initial_probabilities = {}
+    self.emission_probabilities = {}
+    self.backoff_probabilities = {}
+    for state in self.states:
+      self.initial_probabilities[state] = 0
+
+    suffixes = set()
+    tokens = set()
     for sentence in sentences:
-      for s in sentence:
-        token = s[TOKEN_INDEX]
-        pos = s[POS_INDEX]
-        if pos not in self.emission_probabilities:
-          self.emission_probabilities[pos] = {}
-        if token not in self.emission_probabilities[pos]:
-          self.emission_probabilities[pos][token] = 0
-        self.emission_probabilities[pos][token] += 1
+      for index in range(len(sentence)):
+        s = sentence[index]
+        token = s[TOKEN_INDEX].strip()
+        label = s[LABEL_INDEX].strip()
+        tokens.add(token)
+        if index == 0:
+          self.initial_probabilities[label] += 1
 
-  def prob(self, pos, token):
-    pw1 = self.emission_probabilities[pos]
+        if label not in self.emission_probabilities:
+          self.emission_probabilities[label] = {}
+        if token not in self.emission_probabilities[label]:
+          self.emission_probabilities[label][token] = 0.0
+
+        # Suffix backoff. Many POS have same morphology.
+        # For example, nouns tend to end in "-s" and verbs tend to end in "-ed"
+        # For cases where we can't find a word, we will attempt to use the suffix
+        # to assign a probability
+        for suffix_length in range(1, SUFFIX_LENGTH + 1):
+          suffix = token[-suffix_length:]
+          if len(suffix) > 0:
+            if label not in self.backoff_probabilities:
+              self.backoff_probabilities[label] = {}
+            if suffix not in self.backoff_probabilities[label]:
+              self.backoff_probabilities[label][suffix] = 0
+              suffixes.add(suffix)
+            self.backoff_probabilities[label][suffix] += 1
+
+        self.emission_probabilities[label][token] += 1
+
+    # Initial probabilites for labels
+    for label in self.initial_probabilities:
+      self.initial_probabilities[label] = float(self.initial_probabilities[label]) / len(sentences)
+
+    # Plus one smoothing for emissions and backoff probabilities
+    suffixes.add("")
+    self.smooth(self.backoff_probabilities, suffixes)
+    self.smooth(self.emission_probabilities, tokens)
+
+    # Normalize probabilities
+    self.normalize(self.emission_probabilities)
+    self.normalize(self.backoff_probabilities)
+
+  def prob(self, label, token):
+    pw1 = self.emission_probabilities[label]
     pw1w2 = pw1[token]
     count = sum(pw1.values())
 
     return pw1w2 / count
+
+  def viterbi(self, observations):
+    observations = list(map(lambda o: o.strip(), observations))
+    num_observations = len(observations)
+    num_states = len(self.states)
+
+    viterbi = {}
+    backpointer = {}
+
+    first_observation = observations[0]
+    for state in self.states:
+      viterbi[state] = [None] * num_observations
+      backpointer[state] = [0] * num_observations
+      prob = self.emission_probabilities[state][first_observation] if first_observation in self.emission_probabilities[state] else EPSILON
+      viterbi[state][0] = self.initial_probabilities[state] * prob
+
+    max_terminating_score = 0
+    max_terminating_state = None
+    for t in range(1, num_observations):
+      for prev_state in self.states:
+        for curr_state in self.states:
+          pobs = observations[t - 1]
+          obs = observations[t]
+          temp = viterbi[curr_state][t - 1] * self.transition_probabilities.prob(prev_state, curr_state)
+          if obs in self.emission_probabilities[curr_state]:
+            temp *= self.emission_probabilities[curr_state][obs]
+          else:
+            for suffix_length in range(SUFFIX_LENGTH, -1, -1):
+              assert(suffix_length >= 0)
+              suffix = obs[-suffix_length:]
+              if suffix in self.backoff_probabilities[curr_state]:
+                temp *= self.backoff_probabilities[curr_state][suffix]
+                break
+              if suffix_length == 0:
+                temp *= EPSILON
+
+          if viterbi[curr_state][t] is None or (temp > viterbi[curr_state][t]) or (temp == viterbi[curr_state][t] and prev_state == "O"):
+            backpointer[curr_state][t] = prev_state
+            viterbi[curr_state][t] = temp
+            if t == num_observations - 1 and viterbi[curr_state][t] > max_terminating_score:
+              max_terminating_score = viterbi[curr_state][t]
+              max_terminating_state = curr_state
+
+    state = max_terminating_state
+    labels = [state]
+    for t in range(num_observations - 1, 0, -1):
+      state = backpointer[state][t]
+      labels = [state] + labels
+
+    return labels
+
+  def label(self, sentences):
+    labels = []
+    for sentence in sentences:
+      labels += self.viterbi(sentence.split(SEPARATOR))
+    return labels
 
 
 def check_system(system, sentences):
   tokens = []
   expected_labels = []
   for sentence in sentences:
-    tokens.append(SEPARATOR.join(list(map(lambda s: s[TOKEN_INDEX], sentence))))
+    tokens.append(SEPARATOR.join(list(map(lambda s: s[TOKEN_INDEX].lower(), sentence))))
     for s in sentence:
       expected_labels.append(s[LABEL_INDEX].strip())
 
@@ -140,6 +267,9 @@ def main():
 
   baseline = LexiconBaselineSystem(train_sentences)
   check_system(baseline, validation_sentences)
+
+  hmm = HMMSystem(train_sentences)
+  check_system(hmm, validation_sentences)
 
 
 if __name__ == '__main__':
