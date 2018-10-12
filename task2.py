@@ -1,6 +1,4 @@
 # import argparse
-import random
-
 TOKEN_INDEX = 0
 POS_INDEX = 1
 LABEL_INDEX = 2
@@ -101,6 +99,7 @@ class HMMSystem:
     for l in label:
       self.states = self.states.union(set(l))
     self.states = list(self.states)
+    self.states.sort()
 
     self.transition_probabilities = NGram(label)
     self.initial_probabilities = {}
@@ -181,7 +180,7 @@ class HMMSystem:
               if suffix_length == 0:
                 temp *= EPSILON
 
-          if viterbi[curr_state][t] is None or temp > viterbi[curr_state][t]:
+          if viterbi[curr_state][t] is None or (temp > viterbi[curr_state][t]) or (temp == viterbi[curr_state][t] and prev_state == "O"):
             backpointer[curr_state][t] = prev_state
             viterbi[curr_state][t] = temp
             if t == num_observations - 1 and viterbi[curr_state][t] > max_terminating_score:
