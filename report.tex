@@ -1,5 +1,5 @@
 \title{CS 4740 Project 2 Report}
-\author{Shannon Joyner, Jaclyn Huang, Dhiraj Gupta}
+\author{Jaclyn Huang, Dhiraj Gupta, Shannon Joyner}
 \date{\today}
 
 \documentclass[12pt]{article}
@@ -13,3 +13,23 @@
 
 \begin{document}
 \maketitle
+
+\section{Sequence Tagging Model}
+\subsection{Implementation}
+\begin{itemize}
+\item HMM\\
+For HMM, we implemented the Viterbi algorithm. We used the words in sentences as our observations and the BOI labels as our hidden observations. We used a variation of the bigram implementation we made in Projet 1. We stored all probabilities in maps. For example, the emission probabilities were a two layer map. To prevent underflow, we stored all probabilities as logs. We implemented plus one smoothing for emission probabilities. To handle unknown words, we also created a backoff map. For every word in the training set, we stored label probabilities for suffixes of up to length 2. This is based on the observation that nouns tend to have similar endings like "-s", while verbs tend to have endings like "-ed".
+\newline
+For experiments, we used 20\% of the training data to test our hypotheses. one experiment we ran was implementing the backoff probabilites. Originally we just implemented plus 1 smoothing and chose a small epsilon number for unknown words. However, we wanted a better model for unknown words since we know all unknown words are unlikely to have the same probabilities. So we implemented suffix probabilities with the theory that this would give a better estimation for unknown words. Suffix probabilities increased precision by 2\% and recall by 4\%.
+\newline
+\begin{tabular}{|l|l|l|}
+\hline
+& Precision & Recall \\
+\hline
+Baseline & 40.3\% & 26.6\%\\
+\hline
+HMM      & 83.6\% & 62.0\%\\
+\hline
+\end{tabular}
+\end{itemize}
+\end{document}
