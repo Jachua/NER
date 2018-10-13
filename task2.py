@@ -85,12 +85,18 @@ class NGram(object):
         if not ((tag1.startswith("B") or tag1.startswith("I")) and tag2.startswith("I") and tag1.split("-")[1] != tag2.split("-")[1]):
           self.bigrams[tag1][tag2] += 1
 
+    for tag1 in self.bigrams:
+      count = sum(self.bigrams[tag1].values())
+      for tag2 in self.bigrams[tag1]:
+        if self.bigrams[tag1][tag2] == 0:
+          self.bigrams[tag1][tag2] = float("-inf")
+        else:
+          self.bigrams[tag1][tag2] = math.log(self.bigrams[tag1][tag2] / count)
+
   def prob(self, w1, w2):
     pw1 = self.bigrams[w1]
     pw1w2 = pw1[w2]
-    count = sum(pw1.values())
-
-    return pw1w2 / count
+    return pw1w2
 
 
 class HMMSystem:
@@ -203,7 +209,7 @@ class HMMSystem:
         for curr_state in self.states:
           pobs = observations[t - 1]
           obs = observations[t]
-          temp = viterbi[curr_state][t - 1] + self.transition_probabilities.prob(prev_state, curr_state)
+          temp = viterbi[prev_state][t - 1] + self.transition_probabilities.prob(prev_state, curr_state)
           if obs in self.emission_probabilities[curr_state]:
             temp += self.emission_probabilities[curr_state][obs]
           else:
@@ -230,7 +236,6 @@ class HMMSystem:
     for t in range(num_observations - 1, 0, -1):
       state = backpointer[state][t]
       labels = [state] + labels
-
     return labels
 
   def label(self, sentences):
