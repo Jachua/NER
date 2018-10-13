@@ -18,21 +18,24 @@ class LexiconBaselineSystem:
   def _setup(self, sentences):
     for sentence in sentences:
       named_entity = None
+      named_label = None
       for i in range(len(sentence[TOKEN_INDEX])):
         token = sentence[TOKEN_INDEX][i]
         label = sentence[LABEL_INDEX][i]
 
         if label.startswith("B"):
           if named_entity is not None:
-            self.named_entities.add(named_entity)
+            self.named_entities.add(named_entity + "---" + named_label)
           named_entity = token
+          named_label = label.split("-")[1]
         elif label.startswith("I"):
           assert(named_entity is not None)
           named_entity += SEPARATOR + token
         else:
           if named_entity is not None:
-            self.named_entities.add(named_entity)
+            self.named_entities.add(named_entity + "---" + named_label)
             named_entity = None
+            named_label = None
 
   def label(self, sentences):
     labels = []
@@ -40,12 +43,13 @@ class LexiconBaselineSystem:
       sentence = SEPARATOR.join(tokens)
       label = list(map(lambda s: "O", tokens))
       for entity in self.named_entities:
-        index = sentence.find(entity)
-        if index != -1 and sentence[index - 1] == SEPARATOR and ((index + len(entity)) == len(sentence) or sentence[index + len(entity)] == SEPARATOR):
+        [name, l] = entity.split("---")
+        index = sentence.find(name)
+        if index != -1 and sentence[index - 1] == SEPARATOR and ((index + len(name)) == len(sentence) or sentence[index + len(name)] == SEPARATOR):
           word_index = sentence[:index].count(SEPARATOR)
-          label[word_index] = "B"
-          for i in range(len(entity.split(SEPARATOR)) - 1):
-            label[word_index + i] = "I"
+          label[word_index] = "B-" + l
+          for i in range(len(name.split(SEPARATOR)) - 1):
+            label[word_index + i] = "I-" + l
       labels += label
 
     return labels
@@ -246,12 +250,22 @@ def check_system(system, sentences):
   actual_labels = system.label(tokens)
   print("Expected", len(expected_labels), "Actual", len(actual_labels))
   assert(len(expected_labels) == len(actual_labels))
-  num_actual_labels = len(actual_labels)
   num_correct_labels = 0
-  for index in range(num_actual_labels):
-    if actual_labels[index] == expected_labels[index]:
-      num_correct_labels += 1
+  num_actual_labels = 0
+  for index in range(len(actual_labels)):
+    if actual_labels[index] != "O":
+      num_actual_labels += 1
+      if actual_labels[index] == expected_labels[index]:
+        num_correct_labels += 1
   print("Precision:", float(num_correct_labels) * 100 / num_actual_labels)
+  num_correct_labels = 0
+  num_expected_labels = 0
+  for index in range(len(expected_labels)):
+    if expected_labels[index] != "O":
+      num_expected_labels += 1
+      if actual_labels[index] == expected_labels[index]:
+        num_correct_labels += 1
+  print("Recall:", float(num_correct_labels) * 100 / num_expected_labels)
 
 
 def parse(name):
@@ -270,9 +284,11 @@ def parse(name):
 
 def main():
   train_set, dev_set = util.preprocess("train.txt", is_train=False)
+  print("Baseline")
   baseline = LexiconBaselineSystem(train_set)
   check_system(baseline, dev_set)
 
+  print("HMM")
   hmm = HMMSystem(train_set)
   check_system(hmm, dev_set)
 
