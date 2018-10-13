@@ -54,7 +54,8 @@ The intuition behind these features is that they provide a variety of informatio
 \subsection{Pre-Processing}
 We initially applied the same pre-processing for the MEMM as in the HMM. Of course, we also constructed the features described above as part of pre-processing. We omit the detailed explanation, but most of the above features could be computed through a single pass over a given sentence with auxiliary data structures (e.g. constructing bigrams by looking at word pairs and maintaining a dictionary of word to integer mappings). Note that we did not handle unknown words during preprocessing, since the unknown word features take care of that. The features related to words themselves were converted to boolean features, so all of them were set to false.    
 \subsection{Experiments}
-Experiment with features (todo)
+Experiment with features (todo)\\
+Our initial feature template does not contain information about the words themselves such as whether they contain numbers or the shape the words. As a result, unknown words are not represented properly since they tend to be all zeros on the boolean features. Therefore we experimented with the template for handling unknown words as suggested in the textbook. We noted that this kind of input tends to become very informative when predicting whether a word should NOT be associated with a certain label. For instance, if a word does not contain an uppercase letter, then it is very unlikely to be tagged with either $B-LOC, B_MISC, B-PER$ or $B-ORG$. Indeed, all of them are ranked top among the most informative feature, with the most weighted feature among them having a weight of -10, while the $30^th$ most informative feature has a weight with a value of 5. 
 \subsection{Results}
 (todo)
 \section{HMMs vs. MEMMs}
