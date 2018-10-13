@@ -4,39 +4,13 @@ from nltk.classify import maxent
 import re
 import argparse
 import csv
+import util
 
 START = '</s>'
 SSTART = '<//s>'
 END = '<s/>'
 EEND = '<s//>'
 
-def preprocess(train_file, is_test=False, is_train=False):
-    with open(train_file) as f:
-        raw = f.read().split('\n')
-        f.close()
-    size = len(raw)//3
-    data = []    
-    if is_test:
-        indices = []
-        for i in range(0, len(raw), 3):
-            word_arr = raw[i].split()
-            line_length = len(word_arr)
-            default_ner = np.full(line_length, 'O', dtype="<U10")
-            data.append([word_arr, raw[i + 1].split(), default_ner])
-            indices.append([int(idx) for idx in raw[i + 2].split()])
-        return data, indices
-
-    for i in range(0, len(raw), 3):
-        data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
-
-    # data split into 80% training, 20% validation
-    if is_train:
-        return data, []
-    dev_idx = random.sample(range(size), size//5)
-    train_idx = np.setdiff1d(range(size), dev_idx)
-    train_set = [data[idx] for idx in train_idx]
-    dev_set = [data[idx] for idx in dev_idx]
-    return train_set, dev_set
 
 def update(token, bank, next_idx):
     if not token in bank:
@@ -108,8 +82,8 @@ class MEMM(object):
             token_idx[i] = self.bank[i][token[i]]
         return token_idx
 
-    # sample = [[word, ..., word], 
-    #           [POS, ..., POS], 
+    # sample = [[word, ..., word],
+    #           [POS, ..., POS],
     #           [NER, ..., NER]]
     #           np.array
     def construct_feature(self, sample, data_set, is_test=False):
@@ -172,14 +146,14 @@ class MEMM(object):
         else:
             self.state_size = len(self.tags)
             self.idx2state = dict(zip(range(self.state_size), self.tags))
-    
+
     def _from_data_train(self, data):
         for sample in data:
             self.construct_feature(np.array(sample), self.train)
         self.classifier = maxent.MaxentClassifier.train(self.train, trace=5)
         self.classifier.show_most_informative_features(n=30)
-    
-    # data = [[word, ..., word], 
+
+    # data = [[word, ..., word],
     #         [POS, ..., POS]]
     def from_data_test(self, data):
         for sample in data:
@@ -213,10 +187,10 @@ class MEMM(object):
         state_size = self.state_size
         idx2state = self.idx2state
         ob_size = len(line)
-        
+
         #   [[...]
-        # o  [...]  
-        # b  [...]  
+        # o  [...]
+        # b  [...]
         #    [...]]
         #    state
         v = np.zeros((ob_size, state_size))
@@ -253,7 +227,7 @@ def csv_out(preds, indices):
     if prev_tag != 'O':
         output[prev_tag[-4:]].append(str(prev_idx) + '-' + str(cur_idx - 1))
     type_arr = ['PER', 'LOC', 'ORG', 'MISC']
-    pred_arr = [' '.join(output['-PER']), ' '.join(output['-LOC']), ' '.join(output['-ORG']), 
+    pred_arr = [' '.join(output['-PER']), ' '.join(output['-LOC']), ' '.join(output['-ORG']),
                 ' '.join(output['MISC'])]
     with open('memm.csv', 'w') as csvfile:
         w = csv.writer(csvfile, delimiter=',')
@@ -265,13 +239,13 @@ def csv_out(preds, indices):
 #     with open(test_file) as f:
 #         raw = f.read().split('\n')
 #         f.close()
-#     data = []    
+#     data = []
 
 #     for i in range(0, len(raw), 3):
 #         data.append([raw[i].split(), raw[i + 1].split(), raw[i + 2].split()])
 
 #     return data
-        
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -281,7 +255,7 @@ if __name__ == '__main__':
 
 
     # train_set, dev_set = preprocess(args.train_file)
-    train_set, _ = preprocess(args.train_file, is_train=True)
+    train_set, _ = util.preprocess(args.train_file, is_train=True)
     model = MEMM(train_set)
 
     # preds = model.from_data_test(dev_set)
@@ -289,7 +263,7 @@ if __name__ == '__main__':
     #     print("\n\n=====\n\nPredictions\n", preds[i])
     #     print("\n\n=====\n\nCorrect tags\n", dev_set[i][2])
 
-    test_set, indices = preprocess(args.test_file, is_test=True)
+    test_set, indices = util.preprocess(args.test_file, is_test=True)
     # test_set = preprocess_test(args.test_file)
     # model = MEMM(test_set)
 
