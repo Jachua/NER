@@ -17,10 +17,36 @@
 \section{Sequence Tagging Model}
 \subsection{Implementation}
 \begin{itemize}
+\item Baseline\\
+For our baseline implementation, we stored the named entity and it's label in a set. For every sentence, we checked if each named entity existed in the sentence and if so, gave the named entity that label.
 \item HMM\\
 For HMM, we implemented the Viterbi algorithm. We used the words in sentences as our observations and the BOI labels as our hidden observations. We used a variation of the bigram implementation we made in Projet 1. We stored all probabilities in maps. For example, the emission probabilities were a two layer map. To prevent underflow, we stored all probabilities as logs. We implemented plus one smoothing for emission probabilities. To handle unknown words, we also created a backoff map. For every word in the training set, we stored label probabilities for suffixes of up to length 2. This is based on the observation that nouns tend to have similar endings like "-s", while verbs tend to have endings like "-ed".
-\newline
-For experiments, we used 20\% of the training data to test our hypotheses. one experiment we ran was implementing the backoff probabilites. Originally we just implemented plus 1 smoothing and chose a small epsilon number for unknown words. However, we wanted a better model for unknown words since we know all unknown words are unlikely to have the same probabilities. So we implemented suffix probabilities with the theory that this would give a better estimation for unknown words. Suffix probabilities increased precision by 2\% and recall by 4\%.
+\item MEMM\\
+We implemented the MEMM similarly to the HMM with respect to algorithms and data structures. The primary difference between the HMM and MEMM comes from the MaxEnt classifier. Unlike an HMM, a MEMM predicts tags by computing the probability $P(c|x)$ with a MaxEnt classifier, where $c$ is a class (in this case a tag) and $x$ is some feature vector. The MaxEnt classifier code we used comes from {\tt nltk}, and all other code is original.
+
+During the training process, we iterate over the data and construct features for each example sentence. Then we pass the features and labels (BIO tags) to the classifier to train. To predict tags for a sentence in the test data, we construct the feature set for a given test sentence and run the Viterbi algorithm on that sentence (the probabilities come from the trained MaxEnt classifier). We used a dictionary to represent features, since the NLTK MaxEnt classifier converts non-boolean feature dictionaries to boolean feature vectors.
+
+Our final feature set is the following vector:
+\begin{equation*}
+\begin{split}
+[&w_{i - 2},\ w_{i - 1},\ w_i,\ w_{i + 1}w_{i + 2},
+w_{i - 1}w_i,\ w_iw_{i + 1},\ POS_{i - 2},\ POS_{i - 1},\\
+&POS_i,\ w_{i + 1},\ POS_{i + 2}, \ POS_{i - 1}POS_i,\ POS_iPOS_{i + 1},\ NER_{i - 1},\\
+&{\tt word\_shape,\ word\_shape\_short,\ has\_number,\ has\_uppercase,}\\
+&{\tt has\_hyphen, is\_uppercase}
+]
+\end{split}
+\end{equation*}
+where $w_i$ is the $i$th word, $POS_i$ is the part-of-speech tag for $w_i$, and $NER_i$ is the NER tag for $w_i$ (consecutive symbols are bigrams). {\tt word\_shape} refers to the ``format" of a word, so something like ``Donald" would be {\tt Xxxxxx} and something like ``a2z" would be {\tt xdx}.
+The intuition behind these features is that they provide a variety of information about the ``neighborhood" of a word whose tag is being predicted. Considering typical sentences and the way a human would approach the sequence tagging task, we believed that both previous and future words as well as corresponding parts of speech would help the MEMM tag correctly. Bigram features were included because named entities often span multiple words, like ``New York Police Department" or ``Donald Trump." Features like ``word shape" and {\tt has\_number} help with unknown words (since we did not use any tools like language model smoothing) and provide strong signals as to the type of entity (e.g. {\tt has\_number} likely indicates a street address or location, not a person). Many of our experiments involve the features used for the MEMM, so see the experiments section for more detail.
+\end{itemize}
+\subsection{Pre-Processing}
+We initially applied the same pre-processing for the MEMM as in the HMM. Of course, we also constructed the features described above as part of pre-processing. We omit the detailed explanation, but most of the above features could be computed through a single pass over a given sentence with auxiliary data structures (e.g. constructing bigrams by looking at word pairs and maintaining a dictionary of word to integer mappings). Note that we did not handle unknown words during preprocessing, since the unknown word features take care of that. The features related to words themselves were converted to boolean features, so all of them were set to false.
+\subsection{Experiments}
+\begin{itemize}
+\item HMM\\
+For HMM experiments, we used 20\% of the training data to test our hypotheses. one experiment we ran was implementing the backoff probabilites. Originally we just implemented plus 1 smoothing and chose a small epsilon number for unknown words. However, we wanted a better model for unknown words since we know all unknown words are unlikely to have the same probabilities. So we implemented suffix probabilities with the theory that this would give a better estimation for unknown words. Suffix probabilities increased precision by 2\% and recall by 4\%.\\
+Our final precision results for the Baseline and HMM model for the validation data is shown below.\\
 \newline
 \begin{tabular}{|l|l|l|}
 \hline
@@ -31,31 +57,10 @@ Baseline & 40.3\% & 26.6\%\\
 HMM      & 83.6\% & 62.0\%\\
 \hline
 \end{tabular}
-\end{itemize}
-\section{MEMM}
-\subsection{Implementation}
-We implemented the MEMM similarly to the HMM with respect to algorithms and data structures. The primary difference between the HMM and MEMM comes from the MaxEnt classifier. Unlike an HMM, a MEMM predicts tags by computing the probability $P(c|x)$ with a MaxEnt classifier, where $c$ is a class (in this case a tag) and $x$ is some feature vector. The MaxEnt classifier code we used comes from {\tt nltk}, and all other code is original. 
-
-During the training process, we iterate over the data and construct features for each example sentence. Then we pass the features and labels (BIO tags) to the classifier to train. To predict tags for a sentence in the test data, we construct the feature set for a given test sentence and run the Viterbi algorithm on that sentence (the probabilities come from the trained MaxEnt classifier). We used a dictionary to represent features, since the NLTK MaxEnt classifier converts non-boolean feature dictionaries to boolean feature vectors.  
-
-Our final feature set is the following vector:
-\begin{equation*}
-\begin{split}
-[&w_{i - 2},\ w_{i - 1},\ w_i,\ w_{i + 1}w_{i + 2},
-w_{i - 1}w_i,\ w_iw_{i + 1},\ POS_{i - 2},\ POS_{i - 1},\\ 
-&POS_i,\ w_{i + 1},\ POS_{i + 2}, \ POS_{i - 1}POS_i,\ POS_iPOS_{i + 1},\ NER_{i - 1},\\
-&{\tt word\_shape,\ word\_shape\_short,\ has\_number,\ has\_uppercase,}\\ 
-&{\tt has\_hyphen, is\_uppercase}
-]
-\end{split}
-\end{equation*}
-where $w_i$ is the $i$th word, $POS_i$ is the part-of-speech tag for $w_i$, and $NER_i$ is the NER tag for $w_i$ (consecutive symbols are bigrams). {\tt word\_shape} refers to the ``format" of a word, so something like ``Donald" would be {\tt Xxxxxx} and something like ``a2z" would be {\tt xdx}. 
-The intuition behind these features is that they provide a variety of information about the ``neighborhood" of a word whose tag is being predicted. Considering typical sentences and the way a human would approach the sequence tagging task, we believed that both previous and future words as well as corresponding parts of speech would help the MEMM tag correctly. Bigram features were included because named entities often span multiple words, like ``New York Police Department" or ``Donald Trump." Features like ``word shape" and {\tt has\_number} help with unknown words (since we did not use any tools like language model smoothing) and provide strong signals as to the type of entity (e.g. {\tt has\_number} likely indicates a street address or location, not a person). Many of our experiments involve the features used for the MEMM, so see the experiments section for more detail. 
-\subsection{Pre-Processing}
-We initially applied the same pre-processing for the MEMM as in the HMM. Of course, we also constructed the features described above as part of pre-processing. We omit the detailed explanation, but most of the above features could be computed through a single pass over a given sentence with auxiliary data structures (e.g. constructing bigrams by looking at word pairs and maintaining a dictionary of word to integer mappings). Note that we did not handle unknown words during preprocessing, since the unknown word features take care of that. The features related to words themselves were converted to boolean features, so all of them were set to false.    
-\subsection{Experiments}
+\item MEMM\\
 Experiment with features (todo)\\
-Our initial feature template does not contain information about the words themselves such as whether they contain numbers or the shape the words. As a result, unknown words are not represented properly since they tend to be all zeros on the boolean features. Therefore we experimented with the template for handling unknown words as suggested in the textbook. We noted that this kind of input tends to become very informative when predicting whether a word should NOT be associated with a certain label. For instance, if a word does not contain an uppercase letter, then it is very unlikely to be tagged with either $B-LOC, B_MISC, B-PER$ or $B-ORG$. Indeed, all of them are ranked top among the most informative feature, with the most weighted feature among them having a weight of -10, while the $30^th$ most informative feature has a weight with a value of 5. 
+Our initial feature template does not contain information about the words themselves such as whether they contain numbers or the shape the words. As a result, unknown words are not represented properly since they tend to be all zeros on the boolean features. Therefore we experimented with the template for handling unknown words as suggested in the textbook. We noted that this kind of input tends to become very informative when predicting whether a word should NOT be associated with a certain label. For instance, if a word does not contain an uppercase letter, then it is very unlikely to be tagged with either $B-LOC, B_MISC, B-PER$ or $B-ORG$. Indeed, all of them are ranked top among the most informative feature, with the most weighted feature among them having a weight of -10, while the $30^th$ most informative feature has a weight with a value of 5.
+\end{itemize}
 \subsection{Results}
 (todo)
 \section{HMMs vs. MEMMs}
