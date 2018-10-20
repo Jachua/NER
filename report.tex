@@ -68,11 +68,11 @@ The first experiment we ran was implementing the backoff probabilites. Originall
 		\hline
 		\textbf{Metric/Category} & {\tt LOC} & {\tt MISC} & {\tt ORG} & {\tt PER}\\
 		\hline
-		Precision & ? & ? & ? & ?\\
+		Precision & 0.83 & 0.76 & 0.73 & 0.84 \\
 		\hline
-		Recall & ? & ? & ? & ?\\
+		Recall & 0.73 & 0.43 & 0.44 & 0.54 \\
 		\hline
-		F1 Score & ? & ? & ? & ?\\
+		F1 Score & 0.78 & 0.55 & 0.55 & 0.66\\
 		\hline
 	\end{tabular}
 \end{center}
@@ -90,7 +90,7 @@ However, we wanted a better model for unknown words since all unknown words are 
 		\hline
 	\end{tabular}
 \end{center}
-These results are better in almost every aspect, which is expected. Since unknown words are equally likely to be any of the 4 categories of entity, it makes sense that we see a performance improvement across the range of categories rather than in one specific place.  
+These results are better in almost every aspect, which is expected. Since unknown words are equally likely to be any of the 4 categories of entity, it makes sense that we see a performance improvement across the range of categories rather than in one specific place. We initially anticipated a greater improvement in performance with this method, but it might be the case that our validation set did not contain many unknown words and so the impact of the backoff was minimized.   
 \subsection{MEMM}
 The experiments we ran using the MEMM all involved differing feature sets, since the feature set is the key detail which affects performance of a MEMM. Our initial feature template does not contain information about structure of the words: 
 \begin{equation*}
@@ -182,7 +182,7 @@ For comparison purposes, here are the mean precision, recall, and F1 score of ou
 		\hline
 		\textbf{Model/Metric} & Precision & Recall & F1 Score & Kaggle Score\\
 		\hline
-		Baseline & 0.46 & 0.41 & 0.43 & ?\\
+		Baseline & 0.46 & 0.41 & 0.43 & 0.37\\
 		\hline
 		HMM & 0.81 & 0.58 & 0.67 & 0.70\\
 		\hline
@@ -237,6 +237,6 @@ We mistakenly made other submissions under different team names but the team in 
 \begin{itemize}
 	\item Shannon: HMM and baseline implementation
 	\item Jaclyn: MEMM implementation
-	\item Dhiraj: Experiments and error analysis
+	\item Dhiraj: Experiments, error analysis, HMM and MEMM comparison
 \end{itemize}
 \end{document}
