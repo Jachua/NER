@@ -1,7 +1,10 @@
-# Named Entity Recognition 
+# Named Entity Recognition
+## HMM
+
+To run HMM, run ```python3 task2.py```. This will run HMM on the test dataset and print out the precision/recall values.
 
 ## Maximum Entropy Markov Model
-Feature template 
+Feature template
 
 $
 <NER_i, w_{i - 2}>, <NER_i, w_{i - 1}>, <NER_i, w_i, w_{i + 1}>, <NER_i, w_{i + 2}>, <NER_i, w_{i - 1}, w_i>, <NER_i, w_iw_{i + 1}>, <NER_i, POS_{i - 2}>, <NER_i, POS_{i - 1}>, <NER_i, POS_i>, <NER_i, w_{i + 1}>, <NER_i, POS_{i + 2}>, <NER_i, POS_{i - 1}, POS_i>, <NER_i, POS_i, POS_{i + 1}> <NER_i, NER_{i - 1}>
