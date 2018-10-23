@@ -50,7 +50,7 @@ class LexiconBaselineSystem:
           label[word_index] = "B-" + l
           for i in range(len(name.split(SEPARATOR)) - 1):
             label[word_index + i] = "I-" + l
-      labels += label
+      labels.append(label)
 
     return labels
 
@@ -232,6 +232,8 @@ class HMMSystem:
                 max_terminating_state = curr_state
 
     state = max_terminating_state
+    if state == None:
+      state = "O"
     labels = [state]
     for t in range(num_observations - 1, 0, -1):
       state = backpointer[state][t]
@@ -241,23 +243,29 @@ class HMMSystem:
   def label(self, sentences):
     labels = []
     for sentence in sentences:
-      labels += self.viterbi(sentence)
+      labels.append(self.viterbi(sentence))
     return labels
 
 
-def check_system(system, sentences):
+def check_system(system, sentences, indices):
   tokens = []
   expected_labels = []
   for sentence in sentences:
     tokens.append(sentence[TOKEN_INDEX])
-    expected_labels += sentence[LABEL_INDEX]
+    #expected_labels += sentence[LABEL_INDEX]
 
   actual_labels = system.label(tokens)
+  util.csv_out(actual_labels, indices)
+
+  return
   print("Expected", len(expected_labels), "Actual", len(actual_labels))
   assert(len(expected_labels) == len(actual_labels))
   num_correct_labels = 0
   num_actual_labels = 0
   for index in range(len(actual_labels)):
+    print("sentence", sentence[index])
+    print("actual", actual_labels[0:10])
+    print("expected", expected_labels[0:10])
     if actual_labels[index] != "O":
       num_actual_labels += 1
       if actual_labels[index] == expected_labels[index]:
@@ -288,14 +296,15 @@ def parse(name):
 
 
 def main():
-  train_set, dev_set = util.preprocess("train.txt", is_train=False)
+  train_set, _ = util.preprocess("train.txt", is_train=True)
+  test_set, indices = util.preprocess("test.txt", is_test=True)
   print("Baseline")
-  baseline = LexiconBaselineSystem(train_set)
-  check_system(baseline, dev_set)
+#  baseline = LexiconBaselineSystem(train_set)
+#  check_system(baseline, test_set)
 
   print("HMM")
   hmm = HMMSystem(train_set)
-  check_system(hmm, dev_set)
+  check_system(hmm, test_set, indices)
 
 
 if __name__ == '__main__':
